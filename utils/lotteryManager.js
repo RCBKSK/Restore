@@ -1,4 +1,4 @@
-onst supabase = require('./supabaseClient');
+const supabase = require('./supabaseClient');
 const messageTemplates = require('./messageTemplates');
 const { updateLotteryMessage } = require('./messageUpdater');
 
