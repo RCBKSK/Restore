@@ -36,7 +36,7 @@ class LotteryManager {
         return (userTickets / lottery.totalTickets) * 100;
     }
 
-    addParticipant(lotteryId, userId, tickets = 1) {
+    async addParticipant(lotteryId, userId, tickets = 1) {
         const lottery = this.getLottery(lotteryId);
         if (!lottery || lottery.status !== 'active') return false;
 
@@ -50,8 +50,10 @@ class LotteryManager {
         lottery.participants.set(userId, tickets);
         lottery.totalTickets += tickets;
 
-        // Update Supabase
-        this.updateParticipantsInDatabase(lotteryId);
+        // Update Supabase and track analytics
+        await this.updateParticipantsInDatabase(lotteryId);
+        const analyticsManager = require('./analyticsManager');
+        await analyticsManager.trackParticipation(lotteryId, userId, 'join', tickets);
 
         return true;
     }
@@ -148,8 +150,22 @@ class LotteryManager {
         try {
             const channel = await this.client.channels.fetch(lottery.channelid);
             if (channel) {
+                // Refund skulls to all participants
+                for (const [userId, tickets] of lottery.participants) {
+                    const refundAmount = tickets * lottery.ticketPrice;
+                    if (refundAmount > 0) {
+                        await skullManager.addSkulls(userId, refundAmount);
+                        try {
+                            const user = await this.client.users.fetch(userId);
+                            await user.send(`Your ${refundAmount} skulls have been refunded for lottery ${lottery.id} (${lottery.prize}) due to insufficient participants.`);
+                        } catch (error) {
+                            console.error(`Failed to DM user ${userId} about refund:`, error);
+                        }
+                    }
+                }
+                
                 await channel.send(
-                    `⚠️ Lottery ${lottery.id} for ${lottery.prize} has ended without winners due to insufficient participants (${lottery.participants.size}/${lottery.minParticipants} required).`
+                    `⚠️ Lottery ${lottery.id} for ${lottery.prize} has ended without winners due to insufficient participants (${lottery.participants.size}/${lottery.minParticipants} required). All participants have been refunded.`
                 );
             }
         } catch (error) {
@@ -209,6 +225,16 @@ class LotteryManager {
             // Check if lottery has enough participants
             if (lottery.participants.size >= lottery.minParticipants) {
                 const winners = await this.drawWinners(lotteryId);
+                
+                // Record winners in analytics
+                const analyticsManager = require('./analyticsManager');
+                await analyticsManager.recordWinners(lotteryId, winners);
+                
+                // Record final participation stats
+                for (const [userId, tickets] of lottery.participants) {
+                    await analyticsManager.trackParticipation(lotteryId, userId, 'complete', tickets);
+                }
+                
                 await this.announceWinners(lottery, winners);
             } else {
                 await this.handleFailedLottery(lottery);

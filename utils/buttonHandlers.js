@@ -201,101 +201,33 @@ async function handleConfirmLottery(interaction, lotteryId) {
 
                 if (!channel) {
                     await lotteryManager.cancelLottery(lotteryId);
-                    await lotteryManager.updateLotteryStatus(
+                    await lotteryManager.updateStatus(
                         lotteryId,
                         "ended",
                     ); //Update supabase even if channel is not found
                     return;
                 }
 
-                if (lottery.participants.size < lottery.minParticipants) {
-                    await updateLotteryMessage(
-                        channel,
-                        lottery.messageId,
-                        lottery,
-                        false,
-                    );
-                    await channel.send(
-                        `Lottery for ${lottery.prize} has ended without winners. Reason: Insufficient participants (${lottery.participants.size}/${lottery.minParticipants} required)`,
-                    );
-                    await lotteryManager.cancelLottery(lotteryId);
-                    await lotteryManager.updateLotteryStatus(
-                        lotteryId,
-                        "ended",
-                    ); //Update supabase even if insufficient participants
-                    return;
-                }
+                if (lottery.participants.size >= lottery.minParticipants) {
+                    const winners = await lotteryManager.drawWinners(lotteryId);
 
-                const winners = await lotteryManager.drawWinners(lotteryId);
-                if (!winners || winners.length === 0) {
+                    // First update the message to show ended status
                     if (channel) {
-                        await updateLotteryMessage(
-                            channel,
-                            lottery.messageId,
-                            lottery,
-                            false,
-                        );
-                        await channel.send(
-                            `Lottery for ${lottery.prize} has ended. No winners were selected due to insufficient participants.`,
-                        );
-                        // Ensure lottery is marked as ended even with no winners
-                        await lotteryManager.updateLotteryStatus(
-                            lotteryId,
-                            "ended",
-                        );
-                    }
-                    clearInterval(updateInterval);
-                    return;
-                }
-
-                if (channel && Array.isArray(winners)) {
-                    const userMentions = new Map();
-                    for (const winnerId of winners) {
-                        try {
-                            const user =
-                                await interaction.client.users.fetch(winnerId);
-                            userMentions.set(winnerId, user.toString());
-                            // Notify winner via DM
-                            await notificationManager.notifyWinner(
-                                user,
-                                lottery,
-                                interaction.client,
-                            );
-                        } catch (error) {
-                            console.error(
-                                `Failed to fetch user ${winnerId}:`,
-                                error,
-                            );
-                            userMentions.set(winnerId, "Unknown User");
-                        }
+                        lottery.status = "ended"; // Update status before updating message
+                        await updateLotteryMessage(channel, lottery.messageId, lottery, false);
                     }
 
-                    await updateLotteryMessage(
-                        channel,
-                        lottery.messageId,
-                        lottery,
-                        false,
-                    );
-
-                    await channel.send({
-                        embeds: [
-                            messageTemplates.createWinnerEmbed(
-                                lottery,
-                                winners,
-                                userMentions,
-                            ),
-                            messageTemplates.createCongratulationsEmbed(
-                                lottery.prize,
-                                winners,
-                                userMentions,
-                            ),
-                        ],
-                    });
-                    await lotteryManager.updateLotteryStatus(
-                        lotteryId,
-                        "ended",
-                    ); // Update after sending winner messages
+                    if (winners && winners.length > 0) {
+                        await lotteryManager.announceWinners(lottery, winners);
+                    } else {
+                        await lotteryManager.handleFailedLottery(lottery);
+                    }
+                } else {
+                    await lotteryManager.handleFailedLottery(lottery);
                 }
+
+                await lotteryManager.updateStatus(lotteryId, "ended");
+
             }
         }, lottery.endTime - Date.now());
     }
@@ -388,7 +320,7 @@ async function handleJoinLottery(interaction, lotteryId) {
     // Skip skull check for /sd command lotteries (they're always free)
     if (lottery.ticketPrice > 0) {
         if (
-            !skullManager.hasEnoughSkulls(
+            !await skullManager.hasEnoughSkulls(
                 interaction.user.id,
                 lottery.ticketPrice,
             )
@@ -404,7 +336,7 @@ async function handleJoinLottery(interaction, lotteryId) {
     // If this is a raffle or ticket-based lottery, ask for ticket quantity
     if (lottery.ticketPrice > 0) {
         const maxAffordableTickets = Math.floor(
-            skullManager.getBalance(interaction.user.id) / lottery.ticketPrice,
+            await skullManager.getBalance(interaction.user.id) / lottery.ticketPrice,
         );
         const actualMaxTickets = Math.min(
             maxAffordableTickets,
@@ -479,7 +411,7 @@ async function handleTicketSelection(interaction, lotteryId, quantity) {
     }
 
     const totalCost = quantity * lottery.ticketPrice;
-    if (!skullManager.hasEnoughSkulls(interaction.user.id, totalCost)) {
+    if (!await skullManager.hasEnoughSkulls(interaction.user.id, totalCost)) {
         await interaction.reply({
             content: `You don't have enough skulls to purchase ${quantity} tickets. Required: ${totalCost} skulls.`,
             ephemeral: true,
@@ -488,7 +420,7 @@ async function handleTicketSelection(interaction, lotteryId, quantity) {
     }
 
     // Remove skulls and add participant with tickets
-    const success = skullManager.removeSkulls(interaction.user.id, totalCost);
+    const success = await skullManager.removeSkulls(interaction.user.id, totalCost);
     if (success) {
         const joined = lotteryManager.addParticipant(
             lotteryId,
@@ -507,7 +439,7 @@ async function handleTicketSelection(interaction, lotteryId, quantity) {
             );
         } else {
             // Refund skulls if joining fails
-            skullManager.addSkulls(interaction.user.id, totalCost);
+            await skullManager.addSkulls(interaction.user.id, totalCost);
             await interaction.reply({
                 content: "You are already participating in this lottery!",
                 ephemeral: true,

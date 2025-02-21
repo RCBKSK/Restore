@@ -55,7 +55,7 @@ module.exports = {
         const subcommand = interaction.options.getSubcommand();
 
         if (subcommand === 'balance') {
-            const balance = skullManager.getBalance(interaction.user.id);
+            const balance = await skullManager.getBalance(interaction.user.id);
             const embed = new EmbedBuilder()
                 .setTitle('💀 Skull Balance')
                 .setColor('#FFD700')
@@ -124,7 +124,7 @@ module.exports = {
         const amount = interaction.options.getInteger('amount');
 
         if (subcommand === 'add') {
-            const newBalance = skullManager.addSkulls(targetUser.id, amount);
+            const newBalance = await skullManager.addSkulls(targetUser.id, amount);
             await interaction.reply({ 
                 content: `Added ${amount} skulls to ${targetUser.toString()}. New balance: ${newBalance} skulls`,
                 ephemeral: true 
@@ -137,9 +137,9 @@ module.exports = {
                 console.error('Failed to send DM to user:', error);
             }
         } else if (subcommand === 'remove') {
-            const success = skullManager.removeSkulls(targetUser.id, amount);
+            const success = await skullManager.removeSkulls(targetUser.id, amount);
             if (success) {
-                const newBalance = skullManager.getBalance(targetUser.id);
+                const newBalance = await skullManager.getBalance(targetUser.id);
                 await interaction.reply({ 
                     content: `Removed ${amount} skulls from ${targetUser.toString()}. New balance: ${newBalance} skulls`,
                     ephemeral: true 

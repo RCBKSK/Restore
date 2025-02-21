@@ -1,28 +1,37 @@
 
-const { Pool } = require('pg');
 const supabase = require('./supabaseClient');
 
 class SkullManager {
-    constructor() {
-        this.pool = new Pool({
-            connectionString: process.env.DATABASE_URL
-        });
-    }
+    constructor() {}
 
     async getBalance(userId) {
-        const { rows } = await this.pool.query(
-            'SELECT balance FROM skulls WHERE user_id = $1',
-            [userId]
-        );
-        return rows[0]?.balance || 0;
+        const { data, error } = await supabase
+            .from('skulls')
+            .select('balance')
+            .eq('user_id', userId);
+            
+        if (error) throw error;
+        return data?.[0]?.balance || 0;
     }
 
     async addSkulls(userId, amount) {
-        const { rows } = await this.pool.query(
-            'INSERT INTO skulls (user_id, balance) VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE SET balance = skulls.balance + $2 RETURNING balance',
-            [userId, amount]
-        );
-        return rows[0].balance;
+        const { data, error } = await supabase
+            .from('skulls')
+            .upsert({ 
+                user_id: userId, 
+                balance: amount 
+            }, { 
+                onConflict: 'user_id',
+                target: ['user_id'],
+                update: {
+                    balance: `skulls.balance + ${amount}`
+                }
+            })
+            .select()
+            .single();
+            
+        if (error) throw error;
+        return data.balance;
     }
 
     async removeSkulls(userId, amount) {
@@ -31,10 +40,13 @@ class SkullManager {
             return false;
         }
         
-        await this.pool.query(
-            'UPDATE skulls SET balance = balance - $2 WHERE user_id = $1',
-            [userId, amount]
-        );
+        const newBalance = currentBalance - amount;
+        const { error } = await supabase
+            .from('skulls')
+            .update({ balance: newBalance })
+            .eq('user_id', userId);
+            
+        if (error) throw error;
         return true;
     }
 

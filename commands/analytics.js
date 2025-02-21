@@ -31,8 +31,8 @@ module.exports = {
         const subcommand = interaction.options.getSubcommand();
 
         if (subcommand === 'global') {
-            const globalStats = analyticsManager.getGlobalStats();
-            const topParticipants = analyticsManager.getMostActiveParticipants(10);
+            const globalStats = await analyticsManager.getGlobalStats();
+            const topParticipants = await analyticsManager.getMostActiveParticipants(10);
 
             // Fetch user mentions
             const userMentions = new Map();

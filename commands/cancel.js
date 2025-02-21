@@ -31,16 +31,30 @@ module.exports = {
             return;
         }
 
-        const success = lotteryManager.cancelLottery(lotteryId);
+        const success = await lotteryManager.cancelLottery(lotteryId);
         if (success) {
-            await interaction.reply({ content: `Lottery for ${lottery.prize} has been cancelled.`, ephemeral: true });
+            // Refund skulls to all participants
+            for (const [userId, tickets] of lottery.participants) {
+                const refundAmount = tickets * lottery.ticketPrice;
+                if (refundAmount > 0) {
+                    await skullManager.addSkulls(userId, refundAmount);
+                    try {
+                        const user = await interaction.client.users.fetch(userId);
+                        await user.send(`Your ${refundAmount} skulls have been refunded for lottery ${lottery.id} (${lottery.prize}) due to cancellation.`);
+                    } catch (error) {
+                        console.error(`Failed to DM user ${userId} about refund:`, error);
+                    }
+                }
+            }
+
+            await interaction.reply({ content: `Lottery for ${lottery.prize} has been cancelled and all participants have been refunded.`, ephemeral: true });
 
             // Send a message to the channel where lottery was created
-            if (lottery.channelid) {  // Note: using channelid instead of channelId
+            if (lottery.channelid) {
                 try {
                     const channel = await interaction.client.channels.fetch(lottery.channelid);
                     if (channel) {
-                        await channel.send(`🚫 The lottery for ${lottery.prize} has been cancelled by an administrator.`);
+                        await channel.send(`🚫 The lottery for ${lottery.prize} has been cancelled by an administrator. All participants have been refunded.`);
                     }
                 } catch (error) {
                     console.error('Failed to send cancellation message:', error);
