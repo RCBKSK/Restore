@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const lotteryManager = require('../utils/lotteryManager');
+const { lotteryManager } = require('../utils/lotteryManager');
 const config = require('../config');
 
 module.exports = {

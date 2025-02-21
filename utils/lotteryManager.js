@@ -76,6 +76,18 @@ class LotteryManager {
         }
     }
 
+    removeParticipant(lotteryId, userId) {
+        const lottery = this.getLottery(lotteryId);
+        if (!lottery || !lottery.participants.has(userId)) return false;
+        
+        const tickets = lottery.participants.get(userId);
+        lottery.participants.delete(userId);
+        lottery.totalTickets -= tickets;
+        
+        this.updateParticipantsInDatabase(lotteryId);
+        return true;
+    }
+
 
     // Create a new lottery
     async createLottery({ prize, winners, minParticipants, duration, createdBy, channelId, guildId, isManualDraw = false, ticketPrice = 0, maxTicketsPerUser = 1, terms = null }) {
@@ -115,7 +127,7 @@ class LotteryManager {
             lottery.participants = new Map(Object.entries(lottery.participants));
             this.lotteries.set(id, lottery);
 
-            if (!isManualDraw) {
+            if (!lottery.isManualDraw) {
                 this.setTimer(id, duration);
             }
 
@@ -222,7 +234,19 @@ class LotteryManager {
             clearTimeout(this.timers.get(lotteryId));
             clearInterval(this.updateIntervals.get(lotteryId));
 
-            // Check if lottery has enough participants
+            // For manual draw lotteries, just update the message to show expired status
+            if (lottery.isManualDraw) {
+                lottery.status = "expired";
+                const channel = await this.client.channels.fetch(lottery.channelid);
+                if (channel) {
+                    await channel.send(`⏰ The lottery for ${lottery.prize} has ended. Waiting for manual draw using /draw command.`);
+                    await updateLotteryMessage(channel, lottery.messageId, lottery, false);
+                }
+                await this.updateStatus(lotteryId, "expired");
+                return;
+            }
+
+            // For auto-draw lotteries, proceed with winner selection
             if (lottery.participants.size >= lottery.minParticipants) {
                 const winners = await this.drawWinners(lotteryId);
                 
@@ -250,7 +274,7 @@ class LotteryManager {
     // Draw winners for a lottery
     async drawWinners(lotteryId) {
         const lottery = this.getLottery(lotteryId);
-        if (!lottery || lottery.status !== "active") return [];
+        if (!lottery || (lottery.status !== "active" && lottery.status !== "expired")) return [];
 
         const winners = new Set();
         const ticketPool = [];
@@ -346,7 +370,7 @@ class LotteryManager {
             const { data: lotteries, error } = await supabase
                 .from("lotteries")
                 .select("*")
-                .or(`status.eq.active,endTime.gt.${now - 300000}`); // 5-minute buffer
+                .or(`status.eq.active,status.eq.expired,endTime.gt.${now - 300000}`); // Include expired lotteries
 
             if (error) throw error;
 
@@ -372,18 +396,20 @@ class LotteryManager {
                     const isExpired = lotteryData.endTime <= now;
                     const shouldBeActive = !isExpired && lotteryData.status === "active";
 
-                    if (shouldBeActive) {
-                        console.log(`[Restoration] Reinitializing active lottery ${lotteryData.id}`);
+                    if (shouldBeActive || (lotteryData.isManualDraw && lotteryData.status === "expired")) {
+                        console.log(`[Restoration] Reinitializing lottery ${lotteryData.id}`);
 
                         // Store in memory
                         this.lotteries.set(lotteryData.id, lotteryData);
 
-                        // Calculate remaining time
-                        const remainingTime = lotteryData.endTime - now;
+                        if (shouldBeActive) {
+                            // Calculate remaining time
+                            const remainingTime = lotteryData.endTime - now;
 
-                        // Restart timers
-                        this.setTimer(lotteryData.id, remainingTime);
-                        this.startUpdateInterval(lotteryData);
+                            // Restart timers
+                            this.setTimer(lotteryData.id, remainingTime);
+                            this.startUpdateInterval(lotteryData);
+                        }
 
                         restoredLotteries.push(lotteryData);
                     } else if (lotteryData.status === "active") {
@@ -410,3 +436,44 @@ module.exports = {
     LotteryManager,
     lotteryManager: lotteryManagerInstance
 };
+
+    async cancelLottery(lotteryId) {
+        const lottery = this.getLottery(lotteryId);
+        if (!lottery || (lottery.status !== "active" && lottery.status !== "expired")) return false;
+
+        try {
+            // Handle refunds for participants
+            for (const [userId, tickets] of lottery.participants) {
+                const refundAmount = tickets * lottery.ticketPrice;
+                if (refundAmount > 0) {
+                    const skullManager = require('./skullManager');
+                    await skullManager.addSkulls(userId, refundAmount);
+                    try {
+                        const user = await this.client.users.fetch(userId);
+                        await user.send(`Your ${refundAmount} skulls have been refunded for lottery ${lottery.id} (${lottery.prize}) due to cancellation.`);
+                    } catch (error) {
+                        console.error(`Failed to DM user ${userId} about refund:`, error);
+                    }
+                }
+            }
+
+            // Update lottery status
+            await this.updateStatus(lotteryId, "cancelled");
+            lottery.status = "cancelled";
+
+            // Clear any active timers
+            if (this.timers.has(lotteryId)) {
+                clearTimeout(this.timers.get(lotteryId));
+                this.timers.delete(lotteryId);
+            }
+            if (this.updateIntervals.has(lotteryId)) {
+                clearInterval(this.updateIntervals.get(lotteryId));
+                this.updateIntervals.delete(lotteryId);
+            }
+
+            return true;
+        } catch (error) {
+            console.error("Error cancelling lottery:", error);
+            return false;
+        }
+    }

@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const lotteryManager = require('../utils/lotteryManager');
+const { lotteryManager } = require('../utils/lotteryManager');
 const messageTemplates = require('../utils/messageTemplates');
 const config = require('../config');
 
@@ -27,8 +27,8 @@ module.exports = {
             return;
         }
 
-        if (lottery.status !== 'active') {
-            await interaction.reply({ content: 'This lottery is not active!', ephemeral: true });
+        if (lottery.status !== 'active' && lottery.status !== 'expired') {
+            await interaction.reply({ content: 'This lottery cannot be drawn anymore!', ephemeral: true });
             return;
         }
 
