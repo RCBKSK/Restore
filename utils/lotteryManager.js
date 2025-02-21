@@ -78,7 +78,7 @@ class LotteryManager {
 
 
     // Create a new lottery
-    async createLottery({ prize, winners, minParticipants, duration, createdBy, channelId, guildId, isManualDraw = false, ticketPrice = 0, maxTicketsPerUser = 1, terms = "Winner must have an active C61 account, or a redraw occurs!" }) {
+    async createLottery({ prize, winners, minParticipants, duration, createdBy, channelId, guildId, isManualDraw = false, ticketPrice = 0, maxTicketsPerUser = 1, terms = null }) {
         try {
             const id = Date.now().toString();
             const startTime = Date.now();
@@ -296,31 +296,44 @@ class LotteryManager {
             // Update final message
             await updateLotteryMessage(channel, lottery.messageId, lottery, false);
 
-            // Create userMentions map for winners
+            // Create userMentions map for winners and send DMs
             const userMentions = new Map();
+            const notificationManager = require('./notificationManager');
+            
             for (const winnerId of winners) {
                 try {
                     const user = await this.client.users.fetch(winnerId);
                     userMentions.set(winnerId, user.toString());
+                    // Send DM to winner
+                    await notificationManager.notifyWinner(user, lottery, this.client);
                 } catch (error) {
                     console.error(`Failed to fetch user ${winnerId}:`, error);
                     userMentions.set(winnerId, 'Unknown User');
                 }
             }
 
-            // Send winner announcement
-            await channel.send({
-                embeds: [
-                    messageTemplates.createWinnerEmbed(lottery, winners, userMentions),
-                    messageTemplates.createCongratulationsEmbed(lottery.prize, winners, userMentions)
-                ]
-            });
-
-            // Update Supabase
-            await supabase
+            // Check if winners haven't been announced yet
+            const { data } = await supabase
                 .from("lotteries")
-                .update({ winnerAnnounced: true })
-                .eq("id", lottery.id);
+                .select("winnerAnnounced")
+                .eq("id", lottery.id)
+                .single();
+
+            if (!data?.winnerAnnounced) {
+                // Send winner announcement
+                await channel.send({
+                    embeds: [
+                        messageTemplates.createWinnerEmbed(lottery, winners, userMentions),
+                        messageTemplates.createCongratulationsEmbed(lottery.prize, winners, userMentions)
+                    ]
+                });
+
+                // Update Supabase
+                await supabase
+                    .from("lotteries")
+                    .update({ winnerAnnounced: true })
+                    .eq("id", lottery.id);
+            }
         } catch (error) {
             console.error(`Error announcing winners for ${lottery.id}:`, error);
         }

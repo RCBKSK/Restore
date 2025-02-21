@@ -42,8 +42,7 @@ class AnalyticsManager {
                 .upsert({
                     lottery_id: lotteryId,
                     total_participants: 1,
-                    total_tickets: tickets,
-                    lottery_id: lotteryId
+                    total_tickets: tickets
                 });
 
             if (statsError) throw statsError;
@@ -109,7 +108,7 @@ class AnalyticsManager {
     async getGlobalStats() {
         const { data: participations, error } = await supabase
             .from('participation_history')
-            .select('user_id, lottery_id, tickets');
+            .select('user_id, lottery_id, tickets, action');
 
         if (error) throw error;
 
@@ -119,18 +118,18 @@ class AnalyticsManager {
 
         if (winnersError) throw winnersError;
 
-        const uniqueParticipants = new Set(participations.map(p => p.user_id)).size;
-        const uniqueLotteries = new Set(participations.map(p => p.lottery_id)).size;
-        const totalTickets = participations.reduce((sum, p) => sum + (p.tickets || 1), 0);
-
+        const joinParticipations = participations.filter(p => p.action === 'join');
+        const uniqueParticipants = new Set(joinParticipations.map(p => p.user_id)).size;
+        const uniqueLotteries = new Set(joinParticipations.map(p => p.lottery_id)).size;
+        const totalTickets = joinParticipations.reduce((sum, p) => sum + (p.tickets || 1), 0);
         return {
-            totalParticipations: participations.length,
+            totalParticipations: joinParticipations.length,
             uniqueParticipants,
             totalLotteries: uniqueLotteries,
             totalWinners: winners.length,
             totalTickets,
             averageParticipationRate: uniqueLotteries > 0 
-                ? (participations.length / uniqueLotteries) 
+                ? (joinParticipations.length / uniqueLotteries) 
                 : 0
         };
     }

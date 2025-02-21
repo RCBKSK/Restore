@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require("discord.js");
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const { lotteryManager } = require("./lotteryManager");
 
 class NotificationManager {
@@ -174,13 +174,25 @@ class NotificationManager {
                     { name: "🏆 Prize", value: lottery.prize },
                     {
                         name: "📝 Next Steps",
-                        value: "Please send your wallet address to claim your prize.",
+                        value: "Please select your wallet type and submit your address to claim your prize.",
                     },
                 )
                 .setFooter({ text: `Lottery ID: ${lottery.id}` })
                 .setTimestamp();
 
-            await user.send({ embeds: [embed] });
+            const row = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`wallet_${lottery.id}_submit_polygon`)
+                        .setLabel('Submit Polygon Wallet')
+                        .setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder()
+                        .setCustomId(`wallet_${lottery.id}_submit_arenaz`)
+                        .setLabel('Submit Arena-Z Wallet')
+                        .setStyle(ButtonStyle.Primary)
+                );
+
+            await user.send({ embeds: [embed], components: [row] });
             return true;
         } catch (error) {
             console.error("Failed to send winner notification:", error);

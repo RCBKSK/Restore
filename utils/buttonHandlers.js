@@ -1,4 +1,4 @@
-const { ButtonInteraction, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
+const { ButtonInteraction, ButtonBuilder, ButtonStyle, ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const { lotteryManager } = require('./lotteryManager');
 const messageTemplates = require('./messageTemplates');
 const notificationManager = require('./notificationManager');
@@ -6,10 +6,13 @@ const skullManager = require('./skullManager');
 const supabase = require('./supabaseClient');
 
 async function handleButton(interaction) {
-    const [action, lotteryId, quantity] = interaction.customId.split('_');
+    const [action, lotteryId, quantity, type] = interaction.customId.split('_');
 
     try {
         switch (action) {
+            case 'wallet':
+                await handleWalletSubmission(interaction, lotteryId, type);
+                break;
             case 'ticket':
                 await handleTicketSelection(interaction, lotteryId, parseInt(quantity));
                 break;
@@ -307,6 +310,22 @@ async function handleCancelLottery(interaction, lotteryId) {
     });
 }
 
+async function handleWalletSubmission(interaction, lotteryId, walletType) {
+    const modal = new ModalBuilder()
+        .setCustomId(`wallet_submit_${lotteryId}_${walletType}`)
+        .setTitle(`Submit ${walletType} Wallet Address`);
+
+    const walletInput = new TextInputBuilder()
+        .setCustomId('wallet_address')
+        .setLabel('Enter your wallet address')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+    const firstActionRow = new ActionRowBuilder().addComponents(walletInput);
+    modal.addComponents(firstActionRow);
+    await interaction.showModal(modal);
+}
+
 async function handleJoinLottery(interaction, lotteryId) {
     const lottery = lotteryManager.getLottery(lotteryId);
     if (!lottery || lottery.status !== "active") {
@@ -318,6 +337,9 @@ async function handleJoinLottery(interaction, lotteryId) {
     }
 
     // Skip skull check for /sd command lotteries (they're always free)
+
+
+
     if (lottery.ticketPrice > 0) {
         if (
             !await skullManager.hasEnoughSkulls(
@@ -332,6 +354,22 @@ async function handleJoinLottery(interaction, lotteryId) {
             return;
         }
     }
+
+async function handleWalletSubmission(interaction, lotteryId, walletType) {
+    const modal = new ModalBuilder()
+        .setCustomId(`wallet_submit_${lotteryId}_${walletType}`)
+        .setTitle(`Submit ${walletType} Wallet Address`);
+
+    const walletInput = new TextInputBuilder()
+        .setCustomId('wallet_address')
+        .setLabel('Enter your wallet address')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+    const firstActionRow = new ActionRowBuilder().addComponents(walletInput);
+    modal.addComponents(firstActionRow);
+    await interaction.showModal(modal);
+}
 
     // If this is a raffle or ticket-based lottery, ask for ticket quantity
     if (lottery.ticketPrice > 0) {

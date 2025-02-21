@@ -5,6 +5,7 @@ const {
     Partials,
     REST,
     Routes,
+    EmbedBuilder,
 } = require("discord.js");
 const fs = require("fs");
 const path = require("path");
@@ -41,6 +42,57 @@ for (const file of commandFiles) {
         console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
     }
 }
+
+
+client.on('interactionCreate', async interaction => {
+    if (interaction.isModalSubmit()) {
+        if (interaction.customId.startsWith('wallet_submit_')) {
+            const [, , lotteryId, walletType] = interaction.customId.split('_');
+            const walletAddress = interaction.fields.getTextInputValue('wallet_address');
+            
+            // Get the lottery information
+            const lottery = lotteryManager.getLottery(lotteryId);
+            if (!lottery) {
+                await interaction.reply({ content: 'Could not find lottery information.', ephemeral: true });
+                return;
+            }
+
+            try {
+                // Fetch the creator of the lottery
+                const creator = await interaction.client.users.fetch(lottery.createdBy);
+                
+                const adminEmbed = new EmbedBuilder()
+                    .setTitle('🏦 Wallet Address Submitted')
+                    .setColor('#00FF00')
+                    .setDescription(`A winner has submitted their wallet address!`)
+                    .addFields(
+                        { name: '👤 User', value: interaction.user.toString() },
+                        { name: '🎰 Lottery ID', value: lotteryId },
+                        { name: '💼 Wallet Type', value: walletType },
+                        { name: '📝 Address', value: walletAddress }
+                    )
+                    .setTimestamp();
+
+                let notificationSent = false;
+                try {
+                    await creator.send({ embeds: [adminEmbed] });
+                    notificationSent = true;
+                } catch (error) {
+                    console.error(`Failed to notify lottery creator ${creator.tag}:`, error);
+                }
+
+                const replyContent = notificationSent 
+                    ? 'Your wallet address has been submitted successfully and the lottery creator has been notified!'
+                    : 'Your wallet address has been submitted successfully, but we could not notify the lottery creator. Please contact them directly.';
+                
+                await interaction.reply({ content: replyContent, ephemeral: true });
+            } catch (error) {
+                console.error('Failed to process wallet submission:', error);
+                await interaction.reply({ content: 'An error occurred while processing your wallet submission.', ephemeral: true });
+            }
+        }
+    }
+});
 
 // Register slash commands
 const rest = new REST({ version: "10" }).setToken(config.token);
