@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const lotteryManager = require('../utils/lotteryManager');
+const { lotteryManager } = require('../utils/lotteryManager');
 const messageTemplates = require('../utils/messageTemplates');
 const permissionChecker = require('../utils/permissionChecker');
 const config = require('../config');

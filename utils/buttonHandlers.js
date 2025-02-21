@@ -1,52 +1,42 @@
-const {
-    ButtonInteraction,
-    ButtonBuilder,
-    ButtonStyle,
-    ActionRowBuilder,
-} = require("discord.js");
-const lotteryManager = require("./lotteryManager");
-const messageTemplates = require("./messageTemplates");
-const notificationManager = require("./notificationManager");
-const skullManager = require("./skullManager");
-const supabase = require("./supabaseClient");
+const { ButtonInteraction, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
+const { lotteryManager } = require('./lotteryManager');
+const messageTemplates = require('./messageTemplates');
+const notificationManager = require('./notificationManager');
+const skullManager = require('./skullManager');
+const supabase = require('./supabaseClient');
 
 async function handleButton(interaction) {
-    const [action, lotteryId, quantity] = interaction.customId.split("_");
+    const [action, lotteryId, quantity] = interaction.customId.split('_');
 
     try {
         switch (action) {
-            case "ticket":
-                await handleTicketSelection(
-                    interaction,
-                    lotteryId,
-                    parseInt(quantity),
-                );
+            case 'ticket':
+                await handleTicketSelection(interaction, lotteryId, parseInt(quantity));
                 break;
-            case "confirm":
+            case 'confirm':
                 await handleConfirmLottery(interaction, lotteryId);
                 break;
-            case "cancel":
+            case 'cancel':
                 await handleCancelLottery(interaction, lotteryId);
                 break;
-            case "join":
+            case 'join':
                 await handleJoinLottery(interaction, lotteryId);
                 break;
-            case "view":
+            case 'view':
                 await handleViewParticipants(interaction, lotteryId);
                 break;
-            case "auto":
+            case 'auto':
                 await handleAutoDrawSetting(interaction, lotteryId);
                 break;
-            case "manual":
+            case 'manual':
                 await handleManualDrawSetting(interaction, lotteryId);
                 break;
         }
     } catch (error) {
-        console.error("Button interaction error:", error);
+        console.error('Button interaction error:', error);
         const response = {
-            content:
-                "There was an error processing your request. Please try again.",
-            ephemeral: true,
+            content: 'There was an error processing your request. Please try again.',
+            ephemeral: true
         };
 
         try {
@@ -58,10 +48,11 @@ async function handleButton(interaction) {
                 await interaction.reply(response);
             }
         } catch (err) {
-            console.error("Failed to send error response:", err);
+            console.error('Failed to send error response:', err);
         }
     }
 }
+
 
 async function updateLotteryMessage(channel, messageId, lottery, includeButtons = true) {
     try {
@@ -339,38 +330,30 @@ async function handleViewParticipants(interaction, lotteryId) {
 }
 
 async function handleAutoDrawSetting(interaction, lotteryId) {
-    const lottery = lotteryManager.getLottery(lotteryId);
+    const lottery = lotteryManager.getLottery(lotteryId); 
     if (!lottery) {
-        await interaction.reply({
-            content: "Lottery not found!",
-            ephemeral: true,
-        });
+        await interaction.reply({ content: 'Lottery not found!', ephemeral: true });
         return;
     }
 
     lottery.isManualDraw = false;
-    await interaction.reply({
-        content:
-            "Auto draw enabled. Winners will be automatically selected when the timer ends.",
-        ephemeral: true,
+    await interaction.reply({ 
+        content: 'Auto draw enabled. Winners will be automatically selected when the timer ends.',
+        ephemeral: true
     });
 }
 
 async function handleManualDrawSetting(interaction, lotteryId) {
-    const lottery = lotteryManager.getLottery(lotteryId);
+    const lottery = lotteryManager.getLottery(lotteryId); 
     if (!lottery) {
-        await interaction.reply({
-            content: "Lottery not found!",
-            ephemeral: true,
-        });
+        await interaction.reply({ content: 'Lottery not found!', ephemeral: true });
         return;
     }
 
     lottery.isManualDraw = true;
-    await interaction.reply({
-        content:
-            "Manual draw enabled. Use /draw command to select winners when ready.",
-        ephemeral: true,
+    await interaction.reply({ 
+        content: 'Manual draw enabled. Use /draw command to select winners when ready.',
+        ephemeral: true
     });
 }
 
@@ -538,6 +521,20 @@ async function handleTicketSelection(interaction, lotteryId, quantity) {
     }
 }
 
+function createActionRow(lotteryId) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`join_${lotteryId}`)
+            .setLabel("🎟️ Join Lottery")
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId(`view_${lotteryId}`)
+            .setLabel("👥 View Participants")
+            .setStyle(ButtonStyle.Secondary)
+    );
+}
+
 module.exports = {
     handleButton,
+    createActionRow
 };

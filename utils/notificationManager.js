@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require("discord.js");
-const lotteryManager = require("./lotteryManager");
+const { lotteryManager } = require("./lotteryManager");
 
 class NotificationManager {
     constructor() {

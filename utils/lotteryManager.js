@@ -20,6 +20,60 @@ class LotteryManager {
         return this.lotteries.get(lotteryId);
     }
 
+    getParticipantTickets(lotteryId, userId) {
+        const lottery = this.getLottery(lotteryId);
+        if (!lottery) return 0;
+        return lottery.participants.get(userId) || 0;
+    }
+
+    getWinningProbability(lotteryId, userId) {
+        const lottery = this.getLottery(lotteryId);
+        if (!lottery || !lottery.participants.has(userId)) return 0;
+
+        const userTickets = this.getParticipantTickets(lotteryId, userId);
+        if (lottery.totalTickets === 0) return 0;
+
+        return (userTickets / lottery.totalTickets) * 100;
+    }
+
+    addParticipant(lotteryId, userId, tickets = 1) {
+        const lottery = this.getLottery(lotteryId);
+        if (!lottery || lottery.status !== 'active') return false;
+
+        // Check if user is already participating
+        if (lottery.participants.has(userId)) return false;
+
+        // Check max tickets per user
+        if (tickets > lottery.maxTicketsPerUser) return false;
+
+        // Add participant with their tickets
+        lottery.participants.set(userId, tickets);
+        lottery.totalTickets += tickets;
+
+        // Update Supabase
+        this.updateParticipantsInDatabase(lotteryId);
+
+        return true;
+    }
+
+    async updateParticipantsInDatabase(lotteryId) {
+        const lottery = this.getLottery(lotteryId);
+        if (!lottery) return;
+
+        try {
+            const participantsObj = Object.fromEntries(lottery.participants);
+            await supabase
+                .from("lotteries")
+                .update({ 
+                    participants: participantsObj,
+                    totalTickets: lottery.totalTickets
+                })
+                .eq("id", lotteryId);
+        } catch (error) {
+            console.error("Error updating participants in database:", error);
+        }
+    }
+
 
     // Create a new lottery
     async createLottery({ prize, winners, minParticipants, duration, createdBy, channelId, guildId, isManualDraw = false, ticketPrice = 0, maxTicketsPerUser = 1, terms = "Winner must have an active C61 account, or a redraw occurs!" }) {
@@ -70,10 +124,6 @@ class LotteryManager {
         }
     }
 
-    // Get a lottery by ID
-    getLottery(lotteryId) {
-        return this.lotteries.get(lotteryId);
-    }
 
     // Update lottery status in Supabase
     async updateStatus(lotteryId, status) {
@@ -220,11 +270,23 @@ class LotteryManager {
             // Update final message
             await updateLotteryMessage(channel, lottery.messageId, lottery, false);
 
+            // Create userMentions map for winners
+            const userMentions = new Map();
+            for (const winnerId of winners) {
+                try {
+                    const user = await this.client.users.fetch(winnerId);
+                    userMentions.set(winnerId, user.toString());
+                } catch (error) {
+                    console.error(`Failed to fetch user ${winnerId}:`, error);
+                    userMentions.set(winnerId, 'Unknown User');
+                }
+            }
+
             // Send winner announcement
             await channel.send({
                 embeds: [
-                    messageTemplates.createWinnerEmbed(lottery, winners),
-                    messageTemplates.createCongratulationsEmbed(lottery.prize, winners)
+                    messageTemplates.createWinnerEmbed(lottery, winners, userMentions),
+                    messageTemplates.createCongratulationsEmbed(lottery.prize, winners, userMentions)
                 ]
             });
 
@@ -303,4 +365,9 @@ class LotteryManager {
     }
 }
 
-module.exports = new LotteryManager();
+const lotteryManagerInstance = new LotteryManager();
+
+module.exports = {
+    LotteryManager,
+    lotteryManager: lotteryManagerInstance
+};

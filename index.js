@@ -61,7 +61,7 @@ const rest = new REST({ version: "10" }).setToken(config.token);
 })();
 
 // Initialize lottery manager
-const lotteryManager = require("./utils/lotteryManager");
+const { lotteryManager } = require("./utils/lotteryManager");
 lotteryManager.setClient(client);
 
 client.once("ready", async () => {

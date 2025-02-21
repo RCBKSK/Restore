@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const lotteryManager = require('../utils/lotteryManager');
+const { lotteryManager } = require('../utils/lotteryManager');
 const messageTemplates = require('../utils/messageTemplates');
 const permissionChecker = require('../utils/permissionChecker');
 const config = require('../config');
@@ -81,17 +81,19 @@ module.exports = {
                 return;
             }
 
-            const lottery = lotteryManager.createLottery({
+            const lottery = await lotteryManager.createLottery({
                 prize: interaction.options.getString('prize'),
                 winners,
                 minParticipants,
                 terms: interaction.options.getString('terms'),
                 duration,
                 createdBy: interaction.user.id,
+                channelId: interaction.channelId,
+                guildId: interaction.guildId,
                 isManualDraw: false,
                 ticketPrice,
                 maxTicketsPerUser: maxTickets,
-                isRaffle: true // New flag to distinguish raffles
+                isRaffle: true
             });
 
             const confirmRow = new ActionRowBuilder()
@@ -125,8 +127,7 @@ module.exports = {
                 ephemeral: true
             });
 
-            lottery.channelId = interaction.channelId;
-            lottery.guildId = interaction.guildId;
+            
 
         } catch (error) {
             console.error('Error in raffle command:', error);
