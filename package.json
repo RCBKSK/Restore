@@ -1,0 +1,16 @@
+{
+  "name": "discord-bot",
+  "version": "1.0.0",
+  "description": "Discord bot for managing lotteries and raffles",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "deploy": "node deploy-commands.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.48.1",
+    "@vitalets/google-translate-api": "^9.2.1",
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.7"
+  }
+}

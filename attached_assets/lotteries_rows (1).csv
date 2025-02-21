@@ -1,0 +1,5 @@
+id,prize,winners,minParticipants,terms,startTime,endTime,participants,maxTicketsPerUser,ticketPrice,messageId,guildId,isManualDraw,status,createdBy,totalTickets,winnerList,channelid
+1739946306697,Test case 2,1,1,"Winner must have an active C61 account, or a redraw occurs!",1739946306697,1739946366697,"{""690116423669776468"":1}",1,0,,,false,active,690116423669776468,1,[],
+1739946517764,Test case 3,1,1,"Winner must have an active C61 account, or a redraw occurs!",1739946517764,1739946579182,"{""690116423669776468"":1}",1,0,,,false,ended,690116423669776468,1,[],
+1739946910567,test case 4,1,1,"Winner must have an active C61 account, or a redraw occurs!",1739946910567,1739946970567,"{""690116423669776468"":1}",1,0,,,false,active,690116423669776468,1,[],
+1739947196779,Test case 5,1,1,"Winner must have an active C61 account, or a redraw occurs!",1739947196779,1739947256779,"{""690116423669776468"":1}",1,0,,,false,active,690116423669776468,1,[],

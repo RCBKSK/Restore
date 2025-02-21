@@ -1,0 +1,2 @@
+id,prize,winners,minParticipants,terms,startTime,endTime,participants,maxTicketsPerUser,ticketPrice,messageId,guildId,isManualDraw,status,createdBy,totalTickets,winnerList,channelid,israffle,winnerannounced
+1740049910510,Test Scenario,1,1,,1740049910510,1740050030510,"{""690116423669776468"":1}",1,0,,,false,ended,690116423669776468,1,"[""{\""id\"":\""690116423669776468\"",\""username\"":\""Unknown User\""}""]",,false,false
